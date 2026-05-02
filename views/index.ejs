@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Episode Manager</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #fafafa;
+            color: #333;
+            padding: 20px;
+        }
+
+        h1,
+        h2 {
+            text-align: center;
+            color: #222;
+        }
+
+        form {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 20px;
+        }
+
+        input[type="text"] {
+            padding: 8px 12px;
+            width: 300px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            margin-right: 10px;
+        }
+
+        button {
+            padding: 8px 15px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            background-color: #007bff;
+            color: white;
+            font-weight: bold;
+            transition: background-color 0.2s ease;
+        }
+
+        button:hover {
+            background-color: #0056b3;
+        }
+
+        hr {
+            margin: 30px 0;
+            border: none;
+            border-top: 1px solid #ccc;
+        }
+
+        ul {
+            list-style: none;
+            padding: 0;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr 1fr;
+            gap: 10px;
+        }
+
+        li {
+            margin: 5px 0;
+        }
+
+        .episodeelement {
+            display: flex;
+            align-items: center;
+            padding: 15px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            background-color: white;
+            transition: background-color 0.2s ease, box-shadow 0.2s ease;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+
+        .episodeelement:hover {
+            background-color: #f0f8ff;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+        }
+
+        .episodeelement input[type="checkbox"] {
+            margin-right: 10px;
+        }
+
+        .episodeelement span.no-select {
+            font-weight: bold;
+            margin-right: 10px;
+        }
+
+        .episodeelement .filename {
+            flex: 1;
+            overflow-x: auto;
+        }
+
+        .no-select {
+            user-select: none;
+            -webkit-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+        }
+
+        .control-buttons {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 15px;
+            gap: 10px;
+        }
+
+        .control-buttons button:nth-child(1) {
+            background-color: #007bff;
+        }
+
+        .control-buttons button:nth-child(2) {
+            background-color: #28a745;
+        }
+
+        .control-buttons button:nth-child(3) {
+            background-color: #dc3545;
+        }
+
+        p {
+            text-align: center;
+            font-style: italic;
+            color: #666;
+        }
+    </style>
+</head>
+
+<body>
+
+    <h1>Upload One Piece Folder</h1>
+
+    <form method="POST" action="/scan">
+        <input type="text" name="folderPath" placeholder="C:\Anime\OnePiece" />
+        <button type="submit">Scan Folder</button>
+    </form>
+
+    <hr />
+
+    <h2>Files</h2>
+    <% if(typeof files !=='undefined' && files.length !==0) { %>
+        <div class="control-buttons">
+            <button onclick="selectAll()">Select All</button>
+            <button onclick="playSelected()">Play Selected</button>
+            <button onclick="clearSelected()">Clear</button>
+        </div>
+
+        <ul>
+            <% files.forEach(file=> { %>
+                <li class="no-select">
+                    <div class="episodeelement" ondblclick="setlastwacthed(this)" onclick="toggleCheckbox(this)"
+                        data-name="<%= file.name %>">
+                        <input type="checkbox" class="fileCheckbox" />
+                        <span class="no-select">
+                            <%= file.episode %>
+                        </span>
+                        <span class="filename">
+                            <%= file.name %>
+                        </span>
+                    </div>
+                </li>
+                <% }) %>
+        </ul>
+        <%} else {%>
+            <p>No files found</p>
+            <%}%>
+
+                <script>
+                    let lastwatched = "<%= lastwatched %>"
+                    if (typeof lastwatched == undefined) {
+                        lastwatched = ""
+                    }
+
+                    function removeLastWatched() {
+                        document.querySelectorAll(".episodeelement").forEach(element => {
+                            if (element.dataset.name === lastwatched) {
+                                element.style.backgroundColor = null;
+                            }
+                        })
+                    }
+
+                    function updateLastWatched() {
+                        document.querySelectorAll(".episodeelement").forEach(element => {
+                            if (lastwatched) {
+                                if (element.dataset.name === lastwatched) {
+                                    element.style.backgroundColor = "yellow";
+                                }
+                            }
+                        })
+                    }
+
+                    updateLastWatched()
+
+                    function selectAll() {
+                        const checkboxes = document.querySelectorAll(".fileCheckbox");
+                        checkboxes.forEach(checkbox => {
+                            checkbox.checked = true;
+                        });
+                    }
+
+                    async function playSelected() {
+                        const checkboxes = document.querySelectorAll('input.fileCheckbox:checked');
+                        const episodeNames = Array.from(checkboxes).map(cb => cb.closest('.episodeelement').dataset.name);
+
+                        if (episodeNames.length === 0) {
+                            alert("Select at least one episode to play");
+                            return;
+                        }
+                        removeLastWatched()
+                        lastwatched = episodeNames[episodeNames.length - 1]
+                        updateLastWatched()
+
+
+                        try {
+                            await fetch("/lastwatched", {
+                                method: "POST",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({ episode: lastwatched })
+                            })
+                        } catch (error) {
+                            console.log(error);
+                        }
+
+                        try {
+                            await fetch('/play', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ episodes: episodeNames })
+                            })
+                        } catch (error) {
+                            console.log(error);
+                        }
+
+
+                    }
+
+                    function clearSelected() {
+                        const checkboxes = document.querySelectorAll(".fileCheckbox");
+                        checkboxes.forEach(checkbox => {
+                            checkbox.checked = false;
+                        });
+                    }
+
+                    async function setlastwacthed(element) {
+                        removeLastWatched()
+                        lastwatched = element.dataset.name
+                        updateLastWatched()
+
+                        try {
+                            await fetch("/lastwatched", {
+                                method: "POST",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({ episode: element.dataset.name })
+                            });
+                        } catch (error) {
+                            console.log(error);
+                        }
+                    }
+
+                    function toggleCheckbox(element) {
+                        const checkbox = element.querySelector(".fileCheckbox");
+                        checkbox.checked = !checkbox.checked;
+                    }
+                </script>
+</body>
+
+</html>
